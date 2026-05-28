@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vw-postgres
+    environment:
+      POSTGRES_USER: vw_admin
+      POSTGRES_PASSWORD: vw_password
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - vw_postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vw_admin -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build: ./auth-service
+    container_name: vw-auth-service
+    environment:
+      PORT: 4001
+      NODE_ENV: development
+      DATABASE_URL: postgresql://vw_admin:vw_password@postgres:5432/authdb
+      JWT_SECRET: dev_access_secret_change_me
+      JWT_REFRESH_SECRET: dev_refresh_secret_change_me
+      ACCESS_TOKEN_EXPIRES_IN: 15m
+      REFRESH_TOKEN_EXPIRES_IN: 7d
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "4001:4001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  vehicle-service:
+    build: ./vehicle-service
+    container_name: vw-vehicle-service
+    environment:
+      PORT: 4002
+      NODE_ENV: development
+      DATABASE_URL: postgresql://vw_admin:vw_password@postgres:5432/vehicledb
+      JWT_SECRET: dev_access_secret_change_me
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "4002:4002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  profile-service:
+    build: ./profile-service
+    container_name: vw-profile-service
+    environment:
+      PORT: 4003
+      NODE_ENV: development
+      DATABASE_URL: postgresql://vw_admin:vw_password@postgres:5432/profiledb
+      JWT_SECRET: dev_access_secret_change_me
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "4003:4003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_AUTH_API_URL: http://localhost:4001/api/auth
+        VITE_VEHICLE_API_URL: http://localhost:4002/api/vehicles
+        VITE_PROFILE_API_URL: http://localhost:4003/api/profile
+    container_name: vw-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - auth-service
+      - vehicle-service
+      - profile-service
+
+volumes:
+  vw_postgres_data:

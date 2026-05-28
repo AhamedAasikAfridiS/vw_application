@@ -1,0 +1,3 @@
+CREATE DATABASE authdb;
+CREATE DATABASE vehicledb;
+CREATE DATABASE profiledb;

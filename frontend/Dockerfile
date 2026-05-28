@@ -1,0 +1,21 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+ARG VITE_AUTH_API_URL
+ARG VITE_VEHICLE_API_URL
+ARG VITE_PROFILE_API_URL
+
+ENV VITE_AUTH_API_URL=$VITE_AUTH_API_URL
+ENV VITE_VEHICLE_API_URL=$VITE_VEHICLE_API_URL
+ENV VITE_PROFILE_API_URL=$VITE_PROFILE_API_URL
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+RUN npm run build
+
+EXPOSE 80
+
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "80"]
