@@ -1,0 +1,81 @@
+name: Build and Push Docker Images to ACR
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  ACR_NAME: ${{ vars.ACR_NAME }}
+  ACR_LOGIN_SERVER: ${{ vars.ACR_NAME }}.azurecr.io
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    name: Build and Push ${{ matrix.image_name }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service_name: auth-service
+            service_path: ./auth-service
+            image_name: auth-service
+
+          - service_name: vehicle-service
+            service_path: ./vehicle-service
+            image_name: vehicle-service
+
+          - service_name: profile-service
+            service_path: ./profile-service
+            image_name: profile-service
+
+          - service_name: frontend
+            service_path: ./frontend
+            image_name: frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to Azure Container Registry
+        run: az acr login --name $ACR_NAME
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg VITE_AUTH_API_URL="${{ vars.VITE_AUTH_API_URL }}" \
+            --build-arg VITE_VEHICLE_API_URL="${{ vars.VITE_VEHICLE_API_URL }}" \
+            --build-arg VITE_PROFILE_API_URL="${{ vars.VITE_PROFILE_API_URL }}" \
+            -t $ACR_LOGIN_SERVER/${{ matrix.image_name }}:$IMAGE_TAG \
+            -t $ACR_LOGIN_SERVER/${{ matrix.image_name }}:latest \
+            ${{ matrix.service_path }}
+
+      - name: Push Docker image
+        run: |
+          docker push $ACR_LOGIN_SERVER/${{ matrix.image_name }}:$IMAGE_TAG
+          docker push $ACR_LOGIN_SERVER/${{ matrix.image_name }}:latest
+
+      # Optional Azure Container Apps deployment example.
+      # Enable and customize this later if you want GitHub Actions to deploy too.
+      #
+      # - name: Deploy to Azure Container App
+      #   uses: azure/container-apps-deploy-action@v2
+      #   with:
+      #     acrName: ${{ env.ACR_NAME }}
+      #     containerAppName: ${{ matrix.service_name }}
+      #     resourceGroup: ${{ vars.AZURE_RESOURCE_GROUP }}
+      #     imageToDeploy: ${{ env.ACR_LOGIN_SERVER }}/${{ matrix.image_name }}:${{ env.IMAGE_TAG }}

@@ -5,7 +5,6 @@ services:
     environment:
       POSTGRES_USER: vw_admin
       POSTGRES_PASSWORD: vw_password
-      POSTGRES_DB: postgres
     ports:
       - "5432:5432"
     volumes:
